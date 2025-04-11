@@ -1,0 +1,37 @@
+# =========================
+# Node Modules (both client and server)
+# =========================
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# =========================
+# Environment Variables
+# =========================
+.env
+client/.env
+server/.env
+
+# =========================
+# Build and Logs
+# =========================
+build/
+dist/
+client/build/
+server/build/
+
+logs/
+*.log
+
+# =========================
+# IDE and OS Files
+# =========================
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# =========================
+# MongoDB dump (if used)
+# =========================
+dump/
