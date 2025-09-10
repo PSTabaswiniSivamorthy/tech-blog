@@ -5,7 +5,7 @@ const Footer = () => {
     <footer>
       <ul className="footer__categories">
         <li>
-          <Link to="/posts/categories/programminglanguages">Programming</Link>
+          <Link to="/posts/categories/programming ">Programming</Link>
         </li>
         <li>
           <Link to="/posts/categories/dsa">DSA</Link>
