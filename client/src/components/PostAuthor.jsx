@@ -15,10 +15,8 @@ const PostAuthor = ({ authorID, createdAt }) => {
     const getAuthor = async () => {
       try {
         const response = await axios.get(
-          `${process.env.REACT_APP_BASE_URL}/users/${authorID}`
+          `${process.env.REACT_APP_BASE_URL}/users/${authorID}`,
         );
-
-        console.log("Author API response:", response.data);
         setAuthor(response.data.user || response.data);
       } catch (error) {
         console.error("Error fetching author:", error);
@@ -55,7 +53,6 @@ const PostAuthor = ({ authorID, createdAt }) => {
             "Unknown time"
           )}
         </small>
-        <br />
 
         {/*  Commented out exact IST time */}
         {/*

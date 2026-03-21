@@ -11,9 +11,11 @@ const CreatePosts = () => {
   const [description, setDescription] = useState("");
   const [thumbnail, setThumbnail] = useState(null);
   const [error, setError] = useState("");
+  const [aiTopic, setAiTopic] = useState("");
+  const [isGeneratingAi, setIsGeneratingAi] = useState(false);
 
   const navigate = useNavigate();
-  const { currentUser } = useContext(UserContext);
+  const { currentUser, showToast } = useContext(UserContext);
   const token = currentUser?.token;
 
   // Redirect to login if user is not logged in
@@ -22,6 +24,49 @@ const CreatePosts = () => {
       navigate("/login");
     }
   }, [token, navigate]);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const restoreDraft = async () => {
+      try {
+        const response = await axios.get(
+          `${process.env.REACT_APP_BASE_URL}/drafts/new`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true,
+          },
+        );
+        const draft = response.data;
+        if (!draft) return;
+        if (draft.title) setTitle(draft.title);
+        if (draft.category) setCategory(draft.category);
+        if (draft.description) setDescription(draft.description);
+      } catch (error) {
+        // Silent restore fail
+      }
+    };
+
+    restoreDraft();
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) return;
+    const timer = setInterval(() => {
+      axios
+        .post(
+          `${process.env.REACT_APP_BASE_URL}/drafts/autosave`,
+          { title, category, description, postId: null },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            withCredentials: true,
+          },
+        )
+        .catch(() => undefined);
+    }, 5000);
+
+    return () => clearInterval(timer);
+  }, [token, title, category, description]);
 
   const POST_CATEGORIES = [
     "Programming",
@@ -73,7 +118,9 @@ const CreatePosts = () => {
 
     // Validate category
     if (!POST_CATEGORIES.includes(category)) {
-      setError("Please select a valid category from the list.");
+      const message = "Please select a valid category from the list.";
+      setError(message);
+      showToast(message, "error");
       return;
     }
 
@@ -92,16 +139,70 @@ const CreatePosts = () => {
           headers: {
             Authorization: `Bearer ${token}`,
           },
-        }
+        },
       );
 
       if (response.status === 200 || response.status === 201) {
+        showToast("Post created successfully.", "success");
         navigate("/");
       } else {
-        setError("Post not created. Try again!");
+        const message = "Post not created. Try again!";
+        setError(message);
+        showToast(message, "error");
       }
     } catch (err) {
-      setError(err.response?.data?.message || "Something went wrong");
+      const message = err.response?.data?.message || "Something went wrong";
+      setError(message);
+      showToast(message, "error");
+    }
+  };
+
+  const generateWithAi = async () => {
+    const topic = aiTopic.trim() || title.trim();
+
+    if (!topic) {
+      const message = "Enter a topic or title before generating AI content.";
+      setError(message);
+      showToast(message, "error");
+      return;
+    }
+
+    setIsGeneratingAi(true);
+    setError("");
+
+    try {
+      const response = await axios.post(
+        `${process.env.REACT_APP_BASE_URL}/posts/ai/draft`,
+        {
+          topic,
+          category,
+          tone: "professional",
+        },
+        {
+          withCredentials: true,
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      );
+
+      const generatedTitle = response.data?.title;
+      const generatedDescription = response.data?.description;
+
+      if (generatedTitle) setTitle(generatedTitle);
+      if (generatedDescription) setDescription(generatedDescription);
+
+      showToast(
+        "AI draft generated. Review and edit before publishing.",
+        "success",
+      );
+    } catch (err) {
+      const message =
+        err.response?.data?.message || "AI draft generation failed.";
+      setError(message);
+      showToast(message, "error");
+    } finally {
+      setIsGeneratingAi(false);
     }
   };
 
@@ -111,6 +212,29 @@ const CreatePosts = () => {
         <h2>Create Post</h2>
         {error && <p className="form__error-message">{error}</p>}
         <form className="form create-post__form" onSubmit={createPost}>
+          <div className="ai-tools">
+            <div className="ai-tools__row">
+              <input
+                type="text"
+                placeholder="AI topic (example: React performance optimization)"
+                value={aiTopic}
+                onChange={(e) => setAiTopic(e.target.value)}
+              />
+              <button
+                type="button"
+                className="btn"
+                onClick={generateWithAi}
+                disabled={isGeneratingAi}
+              >
+                {isGeneratingAi ? "Generating..." : "Write Using AI"}
+              </button>
+            </div>
+            <p className="ai-tools__hint">
+              AI generates a draft title and article body. You can fully edit it
+              before publishing.
+            </p>
+          </div>
+
           <input
             type="text"
             placeholder="Title"

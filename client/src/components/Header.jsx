@@ -1,20 +1,29 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 import { Link } from "react-router-dom";
 import Logo from "../images/Logo.jpg";
 import { FaBars } from "react-icons/fa";
 import { AiOutlineClose } from "react-icons/ai";
 import { UserContext } from "../context/userContext";
+import NotificationBell from "./NotificationBell";
+
 const Header = () => {
   const [isNavShowing, setIsNavShowing] = useState(
-    window.innerWidth > 800 ? true : false
+    window.innerWidth > 800 ? true : false,
   );
-  const toggleNav = () => {
-    setIsNavShowing(!isNavShowing);
-  };
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsNavShowing(window.innerWidth > 800);
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
   const { currentUser } = useContext(UserContext);
 
   const closeNavHandler = () => {
-    if (window.innerwidth < 800) {
+    if (window.innerWidth < 800) {
       setIsNavShowing(false);
     } else {
       setIsNavShowing(true);
@@ -25,13 +34,19 @@ const Header = () => {
     <nav>
       <div className="container nav_container">
         <Link to="/" className="nav_logo">
-          <img src={Logo} alt="Navbar Logo" onClick={closeNavHandler} />
+          <img src={Logo} alt="TechBlog logo" onClick={closeNavHandler} />
+          <span>TechBlog</span>
         </Link>
         {currentUser?.id && isNavShowing && (
           <ul className={`nav_menu ${isNavShowing ? "show" : ""}`}>
             <li>
-              <Link to="/profile/{currentUser.id}" onClick={closeNavHandler}>
+              <Link to={`/profile/${currentUser.id}`} onClick={closeNavHandler}>
                 {currentUser?.name}
+              </Link>
+            </li>
+            <li>
+              <Link to={`/myposts/${currentUser.id}`} onClick={closeNavHandler}>
+                Dashboard
               </Link>
             </li>
             <li>
@@ -45,6 +60,9 @@ const Header = () => {
               </Link>
             </li>
             <li>
+              <NotificationBell />
+            </li>
+            <li>
               <Link to="/logout" onClick={closeNavHandler}>
                 Logout
               </Link>
@@ -53,14 +71,18 @@ const Header = () => {
         )}
         {!currentUser?.id && isNavShowing && (
           <ul className={`nav_menu ${isNavShowing ? "show" : ""}`}>
-            {" "}
             <li>
-              <Link to="/authors" onClick={toggleNav}>
+              <Link to="/authors" onClick={closeNavHandler}>
                 Authors
               </Link>
             </li>
             <li>
-              <Link to="/login" onClick={toggleNav}>
+              <Link to="/register" onClick={closeNavHandler}>
+                Register
+              </Link>
+            </li>
+            <li>
+              <Link to="/login" onClick={closeNavHandler}>
                 Login
               </Link>
             </li>

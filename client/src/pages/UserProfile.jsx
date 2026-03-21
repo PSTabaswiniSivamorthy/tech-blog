@@ -3,6 +3,7 @@ import { FaCheck, FaEdit } from "react-icons/fa";
 import { Link, useNavigate } from "react-router-dom";
 import { UserContext } from "../context/userContext";
 import axios from "axios";
+import DeletePosts from "./DeletePosts.jsx";
 
 const UserProfile = () => {
   const [avatar, setAvatar] = useState(null);
@@ -13,6 +14,10 @@ const UserProfile = () => {
   const [confirmNewPassword, setConfirmNewPassword] = useState("");
   const [isAvatarTouched, setIsAvatarTouched] = useState(false);
   const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("profile");
+  const [posts, setPosts] = useState([]);
+  const [engagement, setEngagement] = useState({ totalFollowers: 0 });
+  const [isDashboardLoading, setIsDashboardLoading] = useState(false);
   const navigate = useNavigate();
   const { currentUser } = useContext(UserContext);
   const token = currentUser?.token;
@@ -33,7 +38,7 @@ const UserProfile = () => {
           {
             withCredentials: true,
             headers: { Authorization: `Bearer ${token}` },
-          }
+          },
         );
 
         const {
@@ -45,12 +50,10 @@ const UserProfile = () => {
         setName(fetchedName || "");
         setEmail(fetchedEmail || "");
         setAvatar(fetchedAvatar || null);
-
-        console.log("Profile fetched:", response.data);
       } catch (error) {
         console.error(
           "Error fetching user:",
-          error.response?.data || error.message
+          error.response?.data || error.message,
         );
       }
     };
@@ -59,6 +62,44 @@ const UserProfile = () => {
       getUser();
     }
   }, [token, currentUser?.id]);
+
+  useEffect(() => {
+    if (activeTab !== "dashboard" || !token) return;
+    const fetchDashboardData = async () => {
+      setIsDashboardLoading(true);
+      try {
+        const postsResp = await axios.get(
+          `${process.env.REACT_APP_BASE_URL}/posts/users/${currentUser.id}`,
+          {
+            withCredentials: true,
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        setPosts(postsResp.data || []);
+        try {
+          const followersResp = await axios.get(
+            `${process.env.REACT_APP_BASE_URL}/follows/${currentUser.id}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+              withCredentials: true,
+            },
+          );
+          setEngagement((prev) => ({
+            ...prev,
+            totalFollowers: followersResp.data?.followerCount || 0,
+          }));
+        } catch (err) {
+          console.error("Error fetching followers:", err);
+        }
+      } catch (error) {
+        console.error("Error fetching posts:", error);
+        setPosts([]);
+      } finally {
+        setIsDashboardLoading(false);
+      }
+    };
+    fetchDashboardData();
+  }, [activeTab, token, currentUser?.id]);
 
   // Handle avatar upload
   const changeAvatarHandler = async () => {
@@ -73,15 +114,14 @@ const UserProfile = () => {
         {
           withCredentials: true,
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
 
-      console.log("Avatar updated:", response.data);
       setAvatar(response?.data.avatar);
     } catch (error) {
       console.error(
         "Error updating avatar:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
     }
   };
@@ -103,17 +143,17 @@ const UserProfile = () => {
         {
           withCredentials: true,
           headers: { Authorization: `Bearer ${token}` },
-        }
+        },
       );
-      console.log("Profile updated:", response.data);
+
       alert("Profile updated successfully!");
-      if (response.status == 200) {
+      if (response.status === 200) {
         navigate("/logout");
       }
     } catch (error) {
       console.error(
         "Error updating profile:",
-        error.response?.data || error.message
+        error.response?.data || error.message,
       );
       setError(error.response.data.message);
     }
@@ -122,91 +162,193 @@ const UserProfile = () => {
   return (
     <section className="profile">
       <div className="container profile__container">
-        <Link to={`/myposts/${currentUser.id}`} className="btn">
-          My Posts
-        </Link>
+        <div className="profile__tabs">
+          <button
+            className={`profile__tab ${activeTab === "profile" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("profile")}
+          >
+            Profile Settings
+          </button>
+          <button
+            className={`profile__tab ${activeTab === "dashboard" ? "is-active" : ""}`}
+            onClick={() => setActiveTab("dashboard")}
+          >
+            My Dashboard
+          </button>
+        </div>
 
-        <div className="profile__details">
-          {/* Avatar Section */}
-          <div className="avatar__wrapper">
-            <div className="profile__avatar">
-              {avatar ? (
-                <img
-                  src={`${process.env.REACT_APP_ASSETS_URL}/uploads/${avatar}`}
-                  alt="User Avatar"
+        {activeTab === "profile" && (
+          <div className="profile__details">
+            {/* Avatar Section */}
+            <div className="avatar__wrapper">
+              <div className="profile__avatar">
+                {avatar ? (
+                  <img
+                    src={`${process.env.REACT_APP_ASSETS_URL}/uploads/${avatar}`}
+                    alt="User Avatar"
+                  />
+                ) : (
+                  <span>No Avatar</span>
+                )}
+              </div>
+              <form className="avatar__form">
+                <input
+                  type="file"
+                  name="avatar"
+                  id="avatar"
+                  onChange={(e) => {
+                    setAvatar(e.target.files[0]);
+                    setIsAvatarTouched(true);
+                  }}
+                  accept="image/png, image/jpeg, image/jpg"
                 />
-              ) : (
-                <span>No Avatar</span>
+                <label htmlFor="avatar">
+                  <FaEdit />
+                </label>
+              </form>
+              {isAvatarTouched && (
+                <button
+                  type="button"
+                  className="profile__avatar-btn"
+                  onClick={changeAvatarHandler}
+                >
+                  <FaCheck />
+                </button>
               )}
             </div>
-            <form className="avatar__form">
+
+            {/* User Info */}
+            <h1>{name}</h1>
+            <p>{email}</p>
+
+            {/* Profile Form */}
+            <form className="form profile__form" onSubmit={handleProfileUpdate}>
+              {error && <p className="form__error-message">{error}</p>}
               <input
-                type="file"
-                name="avatar"
-                id="avatar"
-                onChange={(e) => {
-                  setAvatar(e.target.files[0]);
-                  setIsAvatarTouched(true);
-                }}
-                accept="image/png, image/jpeg, image/jpg"
+                type="text"
+                placeholder="Full Name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
               />
-              <label htmlFor="avatar">
-                <FaEdit />
-              </label>
-            </form>
-            {isAvatarTouched && (
-              <button
-                type="button"
-                className="profile__avatar-btn"
-                onClick={changeAvatarHandler}
-              >
-                <FaCheck />
+              <input
+                type="email"
+                placeholder="Email id"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="Current Password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="New Password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="Confirm New Password"
+                value={confirmNewPassword}
+                onChange={(e) => setConfirmNewPassword(e.target.value)}
+              />
+              <button type="submit" className="btn primary">
+                Update Profile
               </button>
+            </form>
+          </div>
+        )}
+
+        {activeTab === "dashboard" && (
+          <div className="profile__dashboard">
+            {isDashboardLoading ? (
+              <div className="loading">
+                <p>Loading dashboard...</p>
+              </div>
+            ) : (
+              <>
+                <div className="dashboard__kpis">
+                  <article className="dashboard__kpi-card">
+                    <p>Total Posts</p>
+                    <h3>{posts.length}</h3>
+                  </article>
+                  <article className="dashboard__kpi-card">
+                    <p>Categories</p>
+                    <h3>
+                      {posts.length > 0
+                        ? new Set(posts.map((p) => p.category)).size
+                        : 0}
+                    </h3>
+                  </article>
+                  <article className="dashboard__kpi-card">
+                    <p>Followers</p>
+                    <h3>{engagement.totalFollowers}</h3>
+                  </article>
+                  <article className="dashboard__kpi-card">
+                    <p>Latest Activity</p>
+                    <h3>
+                      {posts.length > 0
+                        ? new Date(
+                            posts[0].updatedAt || posts[0].createdAt,
+                          ).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })
+                        : "No activity"}
+                    </h3>
+                  </article>
+                </div>
+                {posts.length > 0 ? (
+                  <div className="dashboard__posts-list">
+                    {posts.map((post) => (
+                      <article key={post._id} className="dashboard__post">
+                        <div className="dashboard__post-info">
+                          <div className="dashboard__post-thumbnail">
+                            <img
+                              src={`${process.env.REACT_APP_ASSETS_URL}/uploads/${post.thumbnail}`}
+                              alt={post.title}
+                            />
+                          </div>
+                          <div className="dashboard__post-details">
+                            <h5>{post.title}</h5>
+                            <p className="dashboard__post-category">
+                              {post.category}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="dashboard__post-actions">
+                          <Link to={`/posts/${post._id}`} className="btn sm">
+                            View
+                          </Link>
+                          <Link
+                            to={`/posts/${post._id}/edit`}
+                            className="btn sm primary"
+                          >
+                            Edit
+                          </Link>
+                          <DeletePosts postId={post._id} />
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="empty-state">
+                    <h3>You haven't written any posts yet</h3>
+                    <p>
+                      Create your first post to start building your audience.
+                    </p>
+                    <Link to="/create" className="btn primary">
+                      Create Post
+                    </Link>
+                  </div>
+                )}
+              </>
             )}
           </div>
-
-          {/* User Info */}
-          <h1>{name}</h1>
-          <p>{email}</p>
-
-          {/* Profile Form */}
-          <form className="form profile__form" onSubmit={handleProfileUpdate}>
-            {error && <p className="form__error-message">{error}</p>}
-            <input
-              type="text"
-              placeholder="Full Name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-            <input
-              type="email"
-              placeholder="Email id"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-            <input
-              type="password"
-              placeholder="Current Password"
-              value={currentPassword}
-              onChange={(e) => setCurrentPassword(e.target.value)}
-            />
-            <input
-              type="password"
-              placeholder="New Password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-            <input
-              type="password"
-              placeholder="Confirm New Password"
-              value={confirmNewPassword}
-              onChange={(e) => setConfirmNewPassword(e.target.value)}
-            />
-            <button type="submit" className="btn primary">
-              Update Profile
-            </button>
-          </form>
-        </div>
+        )}
       </div>
     </section>
   );

@@ -11,7 +11,7 @@ const Login = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const { setCurrentUser } = useContext(UserContext);
+  const { setCurrentUser, showToast } = useContext(UserContext);
 
   const changeInputHandler = (e) => {
     setUserData((prevState) => {
@@ -22,18 +22,30 @@ const Login = () => {
   const loginUser = async (e) => {
     e.preventDefault();
     setError("");
+
+    if (!userData.email.trim() || !userData.password.trim()) {
+      const message = "Please enter both email and password.";
+      setError(message);
+      showToast(message, "error");
+      return;
+    }
+
     try {
       const response = await axios.post(
         `${process.env.REACT_APP_BASE_URL}/users/login`,
-        userData
+        userData,
       );
       const user = response.data; // Use response.data to get user
       setCurrentUser(user);
+      showToast(`Welcome back, ${user.name}!`, "success");
       navigate("/"); // Redirect to the homepage on successful login
     } catch (err) {
-      setError(
-        err.response?.data?.message || "Login failed. Please try again."
-      );
+      const message =
+        err.response?.status === 422
+          ? "Please check your email and password."
+          : err.response?.data?.message || "Login failed. Please try again.";
+      setError(message);
+      showToast(message, "error");
     }
   };
 

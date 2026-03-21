@@ -1,25 +1,33 @@
 import React, { useEffect, useContext, useState } from "react";
 import PostAuthor from "../components/PostAuthor";
 import { Link, useParams } from "react-router-dom";
+import DOMPurify from "dompurify";
 import Loader from "./Loader";
 import DeletePosts from "./DeletePosts";
 import { UserContext } from "../context/userContext";
 import axios from "axios";
+import RecommendationsPanel from "../components/RecommendationsPanel";
+import LiveComments from "../components/LiveComments";
+import FollowAuthor from "../components/FollowAuthor";
+import EngagementBar from "../components/EngagementBar";
 
 const PostDetail = () => {
   const { id } = useParams();
   const [post, setPost] = useState(null);
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [summary, setSummary] = useState("");
+  const [summaryMeta, setSummaryMeta] = useState(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
-  const { currentUser } = useContext(UserContext);
+  const { currentUser, showToast } = useContext(UserContext);
 
   useEffect(() => {
     const getPost = async () => {
       setIsLoading(true);
       try {
         const response = await axios.get(
-          `${process.env.REACT_APP_BASE_URL}/posts/${id}`
+          `${process.env.REACT_APP_BASE_URL}/posts/${id}`,
         );
         setPost(response.data);
       } catch (error) {
@@ -29,7 +37,54 @@ const PostDetail = () => {
     };
 
     getPost();
-  }, []);
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+
+    axios
+      .post(`${process.env.REACT_APP_BASE_URL}/analytics/posts/${id}`, {
+        eventType: "view",
+      })
+      .catch(() => undefined);
+  }, [id]);
+
+  const summarizePost = async () => {
+    if (!post?.description) {
+      showToast("No content to summarize.", "error");
+      return;
+    }
+
+    setIsSummarizing(true);
+    try {
+      console.log("Summarizing content:", post.description.substring(0, 100)); // Debug log
+      console.log(
+        "API URL:",
+        `${process.env.REACT_APP_BASE_URL}/posts/ai/summarize`,
+      );
+
+      const response = await axios.post(
+        `${process.env.REACT_APP_BASE_URL}/posts/ai/summarize`,
+        { content: post.description },
+      );
+
+      console.log("Summary response:", response.data); // Debug log
+      setSummary(response.data?.summary || "");
+      setSummaryMeta({
+        aiSource: response.data?.aiSource || "unknown",
+        cached: Boolean(response.data?.cached),
+      });
+      showToast("Summarization complete!", "success");
+    } catch (err) {
+      console.error("Summarize error:", err); // Debug log
+      showToast(
+        err.response?.data?.message || "Summarization failed.",
+        "error",
+      );
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
 
   if (isLoading) {
     return <Loader />;
@@ -45,20 +100,49 @@ const PostDetail = () => {
               – but leaving as is for now */}
             <PostAuthor authorID={post.creator} createdAt={post.createdAt} />
 
-            {currentUser?.id == post?.creator && (
-              <div className="post-detail__button">
-                <Link
-                  to={`/posts/${post?._id}/edit`}
-                  className="btn sm primary"
-                >
-                  Edit
-                </Link>
-                <DeletePosts postId={id} />
-              </div>
-            )}
+            <div className="post-detail__header-actions">
+              <FollowAuthor authorId={post.creator} />
+              {currentUser?.id === post?.creator && (
+                <div className="post-detail__button">
+                  <Link
+                    to={`/posts/${post?._id}/edit`}
+                    className="btn sm primary"
+                  >
+                    Edit
+                  </Link>
+                  <DeletePosts postId={id} />
+                </div>
+              )}
+            </div>
           </div>
 
           <h1>{post.title}</h1>
+
+          <EngagementBar postId={post._id} />
+
+          <div className="post-detail__summary-tools">
+            <button
+              type="button"
+              className="btn"
+              onClick={summarizePost}
+              disabled={isSummarizing}
+            >
+              {isSummarizing ? "Summarizing..." : "Summarize with AI"}
+            </button>
+          </div>
+
+          {summary ? (
+            <div className="post-detail__summary">
+              <div className="post-detail__summary-header">
+                <h3>AI Summary</h3>
+                <small>
+                  Source: {summaryMeta?.aiSource || "unknown"}
+                  {summaryMeta?.cached ? " | Cached" : ""}
+                </small>
+              </div>
+              <p>{summary}</p>
+            </div>
+          ) : null}
 
           <div className="post-detail__thumbnail">
             {/* Fixed img tag */}
@@ -67,7 +151,14 @@ const PostDetail = () => {
               alt="Post Thumbnail"
             />
           </div>
-          <p dangerouslySetInnerHTML={{ __html: post.description }}></p>
+          <p
+            dangerouslySetInnerHTML={{
+              __html: DOMPurify.sanitize(post.description),
+            }}
+          ></p>
+
+          <RecommendationsPanel postId={post._id} />
+          <LiveComments postId={post._id} />
         </div>
       )}
     </section>

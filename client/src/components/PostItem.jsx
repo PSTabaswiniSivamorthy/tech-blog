@@ -1,6 +1,8 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import DOMPurify from "dompurify";
 import PostAuthor from "../components/PostAuthor";
+import EngagementBar from "../components/EngagementBar";
 
 const PostItem = ({
   postID,
@@ -25,12 +27,20 @@ const PostItem = ({
         <Link to={`/posts/${postID}`}>
           <h3>{postTitle}</h3>
         </Link>
-        <p dangerouslySetInnerHTML={{ __html: shortDesc }}></p>
+        <p
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(shortDesc) }}
+        ></p>
         <div className="post__footer">
           <PostAuthor authorID={authorID} createdAt={createdAt} />
-          <Link to={`/posts/categories/${category}`} className="btn category">
-            {category}
-          </Link>
+          <div className="post__footer-right">
+            <EngagementBar
+              postId={postID}
+              commentLink={`/posts/${postID}#comments`}
+            />
+            <Link to={`/posts/categories/${category}`} className="btn category">
+              {category}
+            </Link>
+          </div>
         </div>
       </div>
     </article>
