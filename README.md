@@ -96,6 +96,7 @@ npm start
 
 ✅ **Recently Completed:**
 
+- Removed hardcoded API keys from utility scripts (Gemini API keys now use env variables)
 - Removed password hash exposure from user profile endpoint
 - Eliminated credential logging from auth operations
 - Added HTML sanitization (DOMPurify) to prevent XSS attacks
@@ -103,16 +104,6 @@ npm start
 - Fixed authorization checks (strict equality)
 - Fixed frontend navigation and routing bugs
 - Added `.env.example` configuration templates
-
-⚠️ **Recommended Before Going Live:**
-
-1. **Backend Tests**: Add Jest test suite for auth, CRUD, authorization
-2. **HTTPS**: Enable SSL/TLS certificates in production
-3. **Rate Limiting**: Add express-rate-limit for brute-force protection
-4. **Input Validation**: Implement joi/yup request validation
-5. **Helmet**: Add security headers with Helmet.js
-6. **Proper Logging**: Use Morgan/Winston without exposing sensitive data
-7. **Error Handling**: Hide stack traces in production
-8. **Database Indexing**: Add indexes to email and creator fields
-9. **Monitoring**: Set up error tracking (Sentry) and uptime monitoring
-10. **Docker**: Containerize for consistent deployments
+- **Hardened AI draft generation**: Robust JSON parsing for Gemini responses (handles markdown-wrapped, malformed, or concatenated JSON)
+- **Sanitized AI output**: Removes misleading count ranges ("+100 to +250 sentences") from AI-generated content
+- **Secure AI integration**: All API keys loaded from environment variables only, fallback to local generation if API fails
