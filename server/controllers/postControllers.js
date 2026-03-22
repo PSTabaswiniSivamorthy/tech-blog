@@ -31,6 +31,39 @@ const normalizeCategory = (value = "") =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
+const tryParseAIDraftJSON = (rawText = "") => {
+  if (!rawText || typeof rawText !== "string") return null;
+
+  const candidates = [rawText.trim()];
+
+  const fenced = rawText.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  if (fenced?.[1]) candidates.push(fenced[1].trim());
+
+  const firstBrace = rawText.indexOf("{");
+  const lastBrace = rawText.lastIndexOf("}");
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    candidates.push(rawText.slice(firstBrace, lastBrace + 1).trim());
+  }
+
+  for (const text of candidates) {
+    try {
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object") continue;
+
+      const title = typeof parsed.title === "string" ? parsed.title.trim() : "";
+      const description =
+        typeof parsed.description === "string" ? parsed.description.trim() : "";
+
+      if (!title || !description) continue;
+      return { title, description };
+    } catch (error) {
+      // Keep trying the next candidate format.
+    }
+  }
+
+  return null;
+};
+
 // =================== MULTI-PROVIDER AI HELPERS ===================
 // Provider order: Gemini (free tier) → OpenAI (optional backup) → Local fallback
 
@@ -52,7 +85,8 @@ const tryGeminiDraft = async ({ topic, category, tone }) => {
     for (const modelName of modelNames) {
       try {
         const model = gemini.getGenerativeModel({ model: modelName });
-        const prompt = `Generate a complete technical blog draft in JSON format with "title" and "description" (HTML) fields. 
+        const prompt = `Generate a complete technical blog draft in JSON format with "title" and "description" (HTML) fields.
+      Return strictly valid JSON only, with no markdown fences and no extra text.
 Topic: ${topic}
 Category: ${category}
 Tone: ${tone}`;
@@ -70,7 +104,12 @@ Tone: ${tone}`;
           continue;
         }
 
-        const parsed = JSON.parse(content);
+        const parsed = tryParseAIDraftJSON(content);
+        if (!parsed) {
+          console.log(`⚠️ Model ${modelName} returned unparsable draft format`);
+          continue;
+        }
+
         console.log(`✅ Gemini draft generation successful with model: ${modelName}`);
         return { draft: parsed, provider: "gemini" };
       } catch (modelError) {
