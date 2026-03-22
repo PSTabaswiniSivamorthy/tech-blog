@@ -45,9 +45,9 @@ const tryParseAIDraftJSON = (rawText = "") => {
     candidates.push(rawText.slice(firstBrace, lastBrace + 1).trim());
   }
 
-  for (const text of candidates) {
+  for (const candidate of candidates) {
     try {
-      const parsed = JSON.parse(text);
+      const parsed = JSON.parse(candidate);
       if (!parsed || typeof parsed !== "object") continue;
 
       const title = typeof parsed.title === "string" ? parsed.title.trim() : "";
@@ -57,12 +57,28 @@ const tryParseAIDraftJSON = (rawText = "") => {
       if (!title || !description) continue;
       return { title, description };
     } catch (error) {
-      // Keep trying the next candidate format.
+      // Try next candidate shape.
     }
   }
 
   return null;
 };
+
+const sanitizeAIDraftText = (value = "") => {
+  if (typeof value !== "string") return "";
+
+  return value
+    .replace(/\+\s*\d+\s*(to|-|–|—)\s*\+?\s*\d+\s*(sentences?|words?)/gi, "")
+    .replace(/\b\d+\s*(to|-|–|—)\s*\d+\s*(sentences?|words?)\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+};
+
+const sanitizeAIDraft = (draft = {}) => ({
+  ...draft,
+  title: sanitizeAIDraftText(draft.title || ""),
+  description: sanitizeAIDraftText(draft.description || ""),
+});
 
 // =================== MULTI-PROVIDER AI HELPERS ===================
 // Provider order: Gemini (free tier) → OpenAI (optional backup) → Local fallback
@@ -87,6 +103,7 @@ const tryGeminiDraft = async ({ topic, category, tone }) => {
         const model = gemini.getGenerativeModel({ model: modelName });
         const prompt = `Generate a complete technical blog draft in JSON format with "title" and "description" (HTML) fields.
       Return strictly valid JSON only, with no markdown fences and no extra text.
+      Do not include word/sentence count ranges like "+100 to +250 sentences" or "100-250 words".
 Topic: ${topic}
 Category: ${category}
 Tone: ${tone}`;
@@ -111,7 +128,7 @@ Tone: ${tone}`;
         }
 
         console.log(`✅ Gemini draft generation successful with model: ${modelName}`);
-        return { draft: parsed, provider: "gemini" };
+        return { draft: sanitizeAIDraft(parsed), provider: "gemini" };
       } catch (modelError) {
         console.log(`⚠️ Model ${modelName} failed:`, modelError.message);
         if (modelName === modelNames[modelNames.length - 1]) {
@@ -602,13 +619,16 @@ const generateAIDraft = async (req, res, next) => {
     });
 
     if (aiDraft) {
+      const cleanedDraft = sanitizeAIDraft(aiDraft);
       return res.status(200).json({
-        ...aiDraft,
+        ...cleanedDraft,
         aiSource: provider,
       });
     }
 
-    const fallbackDraft = generateLocalDraft({ topic, category, tone });
+    const fallbackDraft = sanitizeAIDraft(
+      generateLocalDraft({ topic, category, tone })
+    );
     return res.status(200).json({
       ...fallbackDraft,
       aiSource: "fallback",
