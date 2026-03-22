@@ -1,6 +1,12 @@
 const fetch = require("node-fetch");
+require("dotenv").config();
 
-const apiKey = "AIzaSyC2PTOzpJyxwsHdn5d2M75fZLjy1xuS5rA";
+const apiKey = process.env.GEMINI_API_KEY;
+
+if (!apiKey) {
+  console.error("Missing GEMINI_API_KEY in environment variables.");
+  process.exit(1);
+}
 
 async function listModels() {
   try {
