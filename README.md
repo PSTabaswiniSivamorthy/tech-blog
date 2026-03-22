@@ -90,20 +90,4 @@ npm start
 - Backend: http://localhost:5000
 - API Base: http://localhost:5000/api
 
----
 
-## 🔒 Security & Production Updates
-
-✅ **Recently Completed:**
-
-- Removed hardcoded API keys from utility scripts (Gemini API keys now use env variables)
-- Removed password hash exposure from user profile endpoint
-- Eliminated credential logging from auth operations
-- Added HTML sanitization (DOMPurify) to prevent XSS attacks
-- Implemented environment-driven CORS allowlist
-- Fixed authorization checks (strict equality)
-- Fixed frontend navigation and routing bugs
-- Added `.env.example` configuration templates
-- **Hardened AI draft generation**: Robust JSON parsing for Gemini responses (handles markdown-wrapped, malformed, or concatenated JSON)
-- **Sanitized AI output**: Removes misleading count ranges ("+100 to +250 sentences") from AI-generated content
-- **Secure AI integration**: All API keys loaded from environment variables only, fallback to local generation if API fails
